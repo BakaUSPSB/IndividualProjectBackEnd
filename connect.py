@@ -95,7 +95,7 @@ def get_movie_details(movie_id):
                 "description": movie['description'],
                 "release_year": movie['release_year'],
                 "length": movie['length'],
-                "actors": movie['actors'].split(', '),
+                "actors": movie['actors'],
                 "genre": movie['categories'],
                 # Add more movie details here
             }
