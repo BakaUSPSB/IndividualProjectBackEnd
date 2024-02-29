@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import mysql.connector
 
@@ -150,6 +150,97 @@ def get_actor_details(actor_id):
         print("Error:", e)
         return jsonify({"error": "Unable to fetch movie details"}), 500
 
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
+
+@app.route('/customers')
+def get_customers():
+    try:
+        connection = mysql.connector.connect(**db_config)
+        cursor = connection.cursor(dictionary=True)
+
+        # Count total number of customers
+        cursor.execute("SELECT COUNT(*) AS total FROM customer")
+        total_customers = cursor.fetchone()['total']
+
+        # Pagination parameters
+        per_page = 10  # Adjust this value as per your requirement
+        total_pages = (total_customers + per_page - 1) // per_page
+
+        # Fetch customers for the current page
+        page = request.args.get('page', 1, type=int)
+        offset = (page - 1) * per_page
+
+        query = """
+            SELECT 
+                c.customer_id,
+                c.first_name,
+                c.last_name,
+                c.active,
+                c.email,
+                a.address,
+                a.district,
+                a.city_id,
+                a.postal_code,
+                a.phone,
+                co.country
+            FROM 
+                customer AS c
+            JOIN 
+                address AS a ON c.address_id = a.address_id
+            JOIN 
+                city AS ci ON a.city_id = ci.city_id
+            JOIN 
+                country AS co ON ci.country_id = co.country_id
+            ORDER BY c.customer_id
+            LIMIT %s OFFSET %s
+        """
+
+        cursor.execute(query, (per_page, offset))
+
+        customers = cursor.fetchall()
+
+        response = {
+            'customers': customers,
+            'totalPages': total_pages
+        }
+
+        return jsonify(response)
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"error": "Unable to fetch customers"}), 500
+
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
+
+@app.route('/newcustomer', methods=['POST'])
+def add_customer():
+    data = request.json
+    first_name = data.get('firstName')
+    last_name = data.get('lastName')
+    address_id = data.get('addressId')
+    store_id = data.get('storeId')
+
+    try:
+        connection = mysql.connector.connect(**db_config)
+        cursor = connection.cursor()
+
+        # Insert customer data into the database
+        query = "INSERT INTO customer (first_name, last_name, address_id, store_id) VALUES (%s, %s, %s, %s)"
+        cursor.execute(query, (first_name, last_name, address_id, store_id))
+        connection.commit()
+
+        return jsonify({"message": "Customer added successfully"})
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"error": "Failed to add customer"}), 500
     finally:
         if connection.is_connected():
             cursor.close()
